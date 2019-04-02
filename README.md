@@ -8,6 +8,8 @@ This repository is for **my personal data analytics projects hobby** and i will 
 * Explore weather trends
 * Investigate a dataset
 * A/B Test Result
+* Movies
+* NY Taxi Trip
 
 ## Instruction
 
