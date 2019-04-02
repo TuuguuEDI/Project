@@ -1,0 +1,398 @@
+
+# coding: utf-8
+
+# # Case Study 6.1 - NYC Taxi Trips
+
+# <h1 style="color:red;">Note: If you close this notebook at any time, you will have to run all cells again upon re-opening it.</h1>
+
+# # BEGINNER PYTHON
+
+# As this is a beginner version, we include a lot of code here to help you along the way.
+
+# # Identification Information
+
+# In[1]:
+
+
+# YOUR NAME              = Tuguldur Batjargal
+# YOUR MITX PRO USERNAME = Tuuguu_batjargal
+# YOUR MITX PRO E-MAIL   = tuuguued@gmail.com
+
+
+# # Setup
+
+# Run these cells to install all the packages you need to complete the remainder of the case study. This may take a few minutes, so please be patient.
+
+# In[2]:
+
+
+get_ipython().system(u'pip install featuretools==0.1.19')
+
+
+# # Import
+
+# Import the required tools into the notebook.
+
+# In[3]:
+
+
+import featuretools as ft
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import utils
+from featuretools.primitives import (Count, Day, Hour, Max, Mean, Median, Min,
+                                     Minute, Month, Std, Sum, Week, Weekday,
+                                     Weekend)
+from sklearn.ensemble import GradientBoostingRegressor
+from utils import (compute_features, feature_importances, load_nyc_taxi_data,
+                   preview)
+
+print('Import successful!')
+
+
+# In[4]:
+
+
+get_ipython().magic(u'matplotlib inline')
+
+
+# In[5]:
+
+
+assert ft.__version__ == '0.1.19', 'Make sure you run the command above with the correct version.'
+
+
+# # Data
+
+# Load the NYC taxi trip data. Note that this may take a minute or two, so please be patient.
+
+# In[6]:
+
+
+trips, pickup_neighborhoods, dropoff_neighborhoods = load_nyc_taxi_data()
+preview(trips, 10)
+print('Data load successful!')
+
+
+# We can also plot some aspects of the data to get a better sense of its distributions. For instance, here is the `trip_duration` variable we are going to try to predict.
+
+# In[7]:
+
+
+trips.trip_duration.hist()
+plt.xlabel('Trip Duration in Seconds')
+plt.ylabel('Number of Trips')
+plt.suptitle('Trip Duration Distribution')
+plt.show()
+print('Histogram generation successful!')
+
+
+# In[8]:
+
+
+trips.shape[0]  # Tells us how many trips are in the dataset
+
+
+# <h1 style="color:red;">QUESTION 1: DATA ANALYSIS</h1>
+
+# **Describe the dataset. How many trips are in the dataset? How would you describe the distribution of trip durations? Is there anything else we should observe? Make sure the histogram is visible in the notebook.**
+
+# The trip duration ranges from 0 seconds to 3500 seconds in the NYC.
+# 
+# There are 10000 trips in the dataset. The distribution of the trip durations are as follows:
+# 
+# ~ 25% for trip durations between 0 s and 350 s
+# 
+# ~ 34% for trip durations between 350 s and 700 s
+# 
+# ~ 20% for trip durations between 700 s and 1050 s
+# 
+# ~ 11% for trip durations between 1050 s and 1400 s
+# 
+# ~ 5% for trip durations between 1400 s and 1750 s
+# 
+# ~ 2.5% for trip durations between 1750 s and 2100 s
+# 
+# ~ 1.25% for trip durations between 2100 s and 2450 s
+# 
+# ~ 0.75% for trip durations between 2450 s and 2700 s
+# 
+# ~ 0.5% for trip durations between 2700 s and 3500 s
+# 
+# Most trips (or 90% of all trips) are under 1400 s and the rest (or 10% of all trips) are between 1400 s and 3500 s. The distribution of trip duration is screwed to the left, meaning most trips are short durations or under 25 mins.
+
+# # Entities and Relationships
+
+# In[9]:
+
+
+entities = {
+    "trips": (trips, "id", 'pickup_datetime'),
+    "pickup_neighborhoods": (pickup_neighborhoods, "neighborhood_id"),
+    "dropoff_neighborhoods": (dropoff_neighborhoods, "neighborhood_id"),
+}
+
+relationships = [("pickup_neighborhoods", "neighborhood_id", "trips", "pickup_neighborhood"),
+                 ("dropoff_neighborhoods", "neighborhood_id", "trips", "dropoff_neighborhood")]
+
+print('Entities and relationships successful!')
+
+
+# # Transform Primitives
+
+# In[10]:
+
+
+trans_primitives = [Weekend]
+
+# This may take some time to compute
+features = ft.dfs(entities=entities,
+                  relationships=relationships,
+                  target_entity="trips",
+                  trans_primitives=trans_primitives,
+                  agg_primitives=[],
+                  ignore_variables={"trips": ["pickup_latitude", "pickup_longitude",
+                                              "dropoff_latitude", "dropoff_longitude"]},
+                  features_only=True)
+
+print('Transform primitives successful!')
+
+
+# Here are the features that we just created. Note: This list may contain the `trip_duration` variable. But, rest assured that we will not actually use this variable in training. Our code removes that variable in `utils.py`.
+
+# In[11]:
+
+
+print(f"Number of features: {len(features)}")
+features
+
+
+# Finally, we compute the feature matrix from these features.
+
+# In[12]:
+
+
+feature_matrix = compute_features(features, trips[['id', 'pickup_datetime']])
+preview(feature_matrix, 5)
+
+
+# # First Model
+
+# In[13]:
+
+
+# Split data
+X_train, y_train, X_test, y_test = utils.get_train_test_fm(feature_matrix,.75)
+y_train = np.log(y_train + 1)
+y_test = np.log(y_test + 1)
+
+print('Data split successful!')
+
+
+# In[14]:
+
+
+# This should train within a minute or so
+model = GradientBoostingRegressor(verbose=True)
+model.fit(X_train, y_train)
+print(model.score(X_test, y_test)) # This is the R^2 value of the prediction
+
+print('Training successful!')
+
+
+# <h1 style="color:red;">QUESTION 2: FIRST MODEL</h1>
+
+# **Describe the 2 new features that we added to the model. Do you think these improved the performance from a model that did not have these features? Why?**
+
+# We have generated a 2 new features that were not given originally in the dataset. They are called:
+# 
+#   •IS_WEEKEND(pickup_datetime)
+#   •IS_WEEKEND(dropoff_datetime)
+#   
+# Those 2 features were created using a transform primitive called weekend. The transform primitive is applied to the timestamp information for pick up (pickup_datetime) and drop off (dropoff_datetime). Then it determines if the trip was made during a weekend and returns a boolean (True or False).
+# 
+# Those 2 features will improve the performance of the model. During the weekend, taxi journey times will be quite different than weekdays' taxi journey. Weekends will be busy, and traffic might be bad in a metropolitan city like New York. Therefore, the model can use this information to adjust the predictive algorithm to consider the traffic load during the weekend in NYC. 
+
+# # More Transform Primitives
+
+# In[15]:
+
+
+trans_primitives = [Minute, Hour, Day, Week, Month, Weekday, Weekend]
+
+features = ft.dfs(entities=entities,
+                  relationships=relationships,
+                  target_entity="trips",
+                  trans_primitives=trans_primitives,
+                  agg_primitives=[],
+                  ignore_variables={"trips": ["pickup_latitude", "pickup_longitude",
+                                              "dropoff_latitude", "dropoff_longitude"]},
+                  features_only=True)
+
+print('Transform primitives successful!')
+
+
+# In[16]:
+
+
+print(f"Number of features: {len(features)}")
+features
+
+
+# In[17]:
+
+
+feature_matrix = compute_features(features, trips[['id', 'pickup_datetime']])
+preview(feature_matrix, 5)
+
+
+# In[18]:
+
+
+# Re-split data
+X_train, y_train, X_test, y_test = utils.get_train_test_fm(feature_matrix,.75)
+y_train = np.log(y_train + 1)
+y_test = np.log(y_test + 1)
+
+print('Data split successful!')
+
+
+# In[19]:
+
+
+# This should train within a minute or so
+model = GradientBoostingRegressor(verbose=True)
+model.fit(X_train, y_train)
+print(model.score(X_test, y_test)) # This is the R^2 value of the prediction
+
+print('Training successful!')
+
+
+# <h1 style="color:red;">QUESTION 3: SECOND MODEL</h1>
+
+# **Describe the rest of the new features that we just added to the model. How did this affect performance? Did we have to sacrifice training time?**
+
+# I have added 6 new features, namely: minutes, hour, day, week, month and weekdays.
+# 
+# All of them are transform primitives which apply to datetime column. Then it determines if the trip was made during a specific time period (e.g. minutes, months and weekday) and returns a boolean (True or False).
+# 
+# As we have more primitives that can apply to the datasets, the performance of the model improves as noted by the increase in R^2 value. 
+# 
+# The result shows that we did not have to sacrifice training time as shown above.
+
+# # Aggregation Primitives
+
+# In[20]:
+
+
+trans_primitives = [Minute, Hour, Day, Week, Month, Weekday, Weekend]
+aggregation_primitives = [Count, Sum, Mean, Median, Std, Max, Min]
+
+features = ft.dfs(entities=entities,
+                  relationships=relationships,
+                  target_entity="trips",
+                  trans_primitives=trans_primitives,
+                  agg_primitives=aggregation_primitives,
+                  ignore_variables={"trips": ["pickup_latitude", "pickup_longitude",
+                                              "dropoff_latitude", "dropoff_longitude"]},
+                  features_only=True)
+
+print('Aggregation primitives successful!')
+
+
+# In[21]:
+
+
+print(f"Number of features: {len(features)}")
+features
+
+
+# In[22]:
+
+
+# This may take a bit longer to compute, so please be patient
+feature_matrix = compute_features(features, trips[['id', 'pickup_datetime']])
+preview(feature_matrix, 5)
+
+
+# In[23]:
+
+
+# Re-split data
+X_train, y_train, X_test, y_test = utils.get_train_test_fm(feature_matrix,.75)
+y_train = np.log(y_train + 1)
+y_test = np.log(y_test + 1)
+
+print('Data split successful!')
+
+
+# In[24]:
+
+
+# This should train within a minute or so
+model = GradientBoostingRegressor(verbose=True)
+model.fit(X_train, y_train)
+print(model.score(X_test, y_test)) # This is the R^2 value of the prediction
+
+print('Training successful!')
+
+
+# # Evaluate on Test Data
+
+# In[25]:
+
+
+y_pred = model.predict(X_test)
+y_pred = np.exp(y_pred) - 1 # undo the log we took earlier
+
+print('y_pred computation successful!')
+
+
+# In[26]:
+
+
+# Print the first 5 predictions
+y_pred[:5]
+
+
+# In[27]:
+
+
+# Create a histogram of all of them
+matplotlib.pyplot.hist(y_pred)
+
+print('Histogram generation successful!')
+
+
+# <h1 style="color:red;">QUESTION 4: MODEL PREDICTIONS</h1>
+
+# **Analyze the model predictions. Does the output distribution match the one you made earlier in the case study? What other features/strategies could we use to make our model even better, if we had more time?**
+
+# We are using aggregate features where we apply some functions (e.g. count, sum and mean) across an entire feature column in our datasets and include that value in our feature matrix. These new aggregate primitives (e.g. count, sum and mean) will generate features for the parent entities pickup_neighborhood and dropoff_neighborhood and then add them to the trip entity.
+# 
+# The output distribution of the trips durations roughly matches the original histogram generated earlier in the case study. However, the number of trips are significantly reduced by the new predictive model.
+# 
+# If we had more time, we could apply Deep Feature Synthesis with a max depth of 2 or more. Each time we stack a primitive we increase the “depth” of a feature. Stacking results in features that are more expressive than individual primitives themselves. This enables the automatic creation of complex patterns for machine learning.
+
+# # Feature Importance
+
+# In[28]:
+
+
+feature_importances(model, feature_matrix.columns, n=25)
+
+
+# <h1 style="color:red;">QUESTION 5: FEATURE IMPORTANCE</h1>
+
+# **Analyze the feature importance values you just computed above. Do they make sense? Are there any values you are surprised by? Give some brief explanations as to why these features are relevant in computing the `trip_duration` target variable.**
+
+# Feature_importance provides the relative importance of the feature in the making of the model prediction. Therefore, pickup_neighborhoods.MAX(trips.passenger_count) is a key part of the predictive model. And the rest of the features are relatively less important to the model.
+# 
+# The feature importance can be explained as the ratio between the number of samples routed to a decision node involving that feature in any of the trees of the ensemble over the total number of samples in the training set. Features that are involved in the top level nodes of the decision trees tend to see more samples hence are likely to have more importance.
+# 
+# Therefore pickup_neighborhoods.MAX(trips.passenger_count) is more important to the model as it is involved in the top level nodes of the decision. In simple words, it might be highly useful to know the number of passengers picked up from the neighbourhood locations, as it might influence the trip distance  ( more people might lead to multiple journeys or longer journey.
+
+# <hr>
+
+# Great job! Now, make sure you check out the **Conclusion** section of the [instruction manual](https://courses.edx.org/asset-v1:MITxPRO+DSx+2T2018+type@asset+block@6.1_instruction_manual.html) to wrap up this case study properly.

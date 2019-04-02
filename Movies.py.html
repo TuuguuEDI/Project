@@ -1,0 +1,356 @@
+
+# coding: utf-8
+
+# # Case Study 4.1 - Movies
+
+# <h1 style="color:red;">Note: If you close this notebook at any time, you will have to run all cells again upon re-opening it.</h1>
+
+# # PYTHON
+
+# As this is a beginner version, we include a lot of code here to help you along the way.
+
+# # Identification Information
+
+# # Setup
+
+# Run these cells to install all the packages you need to complete the remainder of the case study. This may take a few minutes, so please be patient.
+
+# In[1]:
+
+
+get_ipython().system(u'pip install surprise==0.1')
+
+
+# Now, you must press **Kernel > Restart.** This allows the installation to take effect. Once you see the blue **Connected/Kernel ready** button in the top right, you are good to go.
+
+# # Import
+
+# Import the required tools into the notebook.
+
+# In[1]:
+
+
+import pandas as pd
+import matplotlib
+from surprise import Dataset, SVD, NormalPredictor, BaselineOnly, KNNBasic, NMF
+from surprise.model_selection import cross_validate, KFold
+print('Imports successful!')
+
+
+# In[2]:
+
+
+get_ipython().magic(u'matplotlib inline')
+
+
+# # Data
+
+# Load the MovieLens data. A dialog may pop up saying **"Dataset ml-100k could not be found. Do you want to download it? [Y/n]"** Type Y and hit Enter to start the download process.
+
+# In[3]:
+
+
+data = Dataset.load_builtin('ml-100k')
+print('Data load successful!')
+
+
+# We also want to get a sense of what the data looks like. Let's create a histogram of all the ratings we have in the dataset.
+
+# In[4]:
+
+
+# 1. Get the ratings file from the data object
+# This is just a filename that has all the data stored in it
+ratings_file = data.ratings_file
+
+# 2. Load that table using pandas, a commmon python data loading tool
+# We set the column names manually here
+col_names = ['user_id', 'item_id', 'rating', 'timestamp']
+raw_data = pd.read_table(ratings_file, names=col_names)
+
+# 3. Get the rating column
+ratings = raw_data.rating
+
+# 4. Generate a bar plot/histogram of that data
+ratings.value_counts().sort_index().plot.bar()
+
+print('Histogram generation successful!')
+
+
+# <h1 style="color:red;">QUESTION 1: DATA ANALYSIS</h1>
+
+# **Describe the dataset. How many ratings are in the dataset? How would you describe the distribution of ratings? Is there anything else we should observe? Make sure the histogram is visible in the notebook.**
+
+# There are 5 different ratings in the dataset and rating range between 1 and 5.
+# Most of the ratings are 3,4 and 5 in the dataset.
+# The distribution of ratings is slightly leaning to favourable ratings (rating >3), and the distribution centre is at 4.
+
+# # Model 1: Random
+
+# In[5]:
+
+
+# Create model object
+model_random = NormalPredictor()
+print('Model creation successful!')
+
+
+# In[6]:
+
+
+# Train on data using cross-validation with k=5 folds, measuring the RMSE
+model_random_results = cross_validate(model_random, data, measures=['RMSE'], cv=5, verbose=True)
+print('Model training successful!')
+
+
+# # Model 2: User-Based Collaborative Filtering
+
+# In[7]:
+
+
+# Create model object
+model_user = KNNBasic(sim_options={'user_based': True})
+print('Model creation successful!')
+
+
+# In[8]:
+
+
+# Train on data using cross-validation with k=5 folds, measuring the RMSE
+# Note, this may have a lot of print output
+# You can set verbose=False to prevent this from happening
+model_user_results = cross_validate(model_user, data, measures=['RMSE'], cv=5, verbose=True)
+print('Model training successful!')
+
+
+# # Model 3: Item-Based Collaborative Filtering
+
+# In[9]:
+
+
+# Create model object
+model_item = KNNBasic(sim_options={'user_based': False})
+print('Model creation successful!')
+
+
+# In[10]:
+
+
+# Train on data using cross-validation with k=5 folds, measuring the RMSE
+# Note, this may have a lot of print output
+# You can set verbose=False to prevent this from happening
+model_item_results = cross_validate(model_item, data, measures=['RMSE'], cv=5, verbose=True)
+print('Model training successful!')
+
+
+# <h1 style="color:red;">QUESTION 2: COLLABORATIVE FILTERING MODELS</h1>
+
+# **Compare the results from the user-user and item-item models. How do they compare to each other? How do they compare to our original "random" model? Can you provide any intuition as to why the results came out the way they did?**
+
+# The user-user model scores RMSE of 0.9786. The item-item model scores RMSE of 0.9740.
+# The item-item model performs slightly better in terms of RMSE compared to the user-user model. The item-item model probably has much better collisions because the movies that really matters have lots of rating.
+# 
+# Both the user-user and item-item models offer significantly better result than the original "random" model. 
+# This is due to that collaborative filtering models uses information about the data ( or personalization). On the other hand, the random model uses no information about the data. Hence, it scored RMSE of 1.5159.
+# 
+
+# # Model 4: Matrix Factorization
+
+# In[11]:
+
+
+# Create model object
+model_matrix = SVD()
+print('Model creation successful!')
+
+
+# In[13]:
+
+
+# Train on data using cross-validation with k=5 folds, measuring the RMSE
+# Note, this may take some time (2-3 minutes) to train, so please be patient
+model_matrix_results = cross_validate(model_matrix, data, measures=['RMSE'], cv=5, verbose=True)
+print('Model training successful!')
+
+
+# <h1 style="color:red;">QUESTION 3: MATRIX FACTORIZATION MODEL</h1>
+
+# **The matrix factorization model is different from the collaborative filtering models. Briefly describe this difference. Also, compare the RMSE again. Does it improve? Can you offer any reasoning as to why that might be?**
+
+# The matrix factorization model offers slightly better RMSE compared to the collaborative filtering models. The matrix factorization model is user-item combination model, using a low-rank matrix factorization rather than the similarity of other models. The matrix factorization is used for the user-item model because it is difficult to measure similarities accurately in high dimensions.
+# 
+# The matrix factorization model is significantly better than the Random model in terms of RMSE, where the matrix factorization scored RMSE of 0.9366 and the random model scored RMSE of 1.5159.
+
+# # Precision and Recall @ `k`
+
+# We now want to compute the precision and recall for 2 values of `k`: 5 and 10. We have provided some code here to help you do that.
+
+# First, we define a function that takes in some predictions, a value of `k` and a threshold parameter. This code is adapted from [here](http://surprise.readthedocs.io/en/stable/FAQ.html?highlight=precision#how-to-compute-precision-k-and-recall-k). **Make sure you run this cell.**
+
+# In[14]:
+
+
+def precision_recall_at_k(predictions, k=10, threshold=3.5):
+    '''Return precision and recall at k metrics for each user.'''
+
+    # First map the predictions to each user.
+    user_est_true = dict()
+    for uid, _, true_r, est, _ in predictions:
+        current = user_est_true.get(uid, list())
+        current.append((est, true_r))
+        user_est_true[uid] = current
+
+    precisions = dict()
+    recalls = dict()
+    for uid, user_ratings in user_est_true.items():
+
+        # Sort user ratings by estimated value
+        user_ratings.sort(key=lambda x: x[0], reverse=True)
+
+        # Number of relevant items
+        n_rel = sum((true_r >= threshold) for (_, true_r) in user_ratings)
+
+        # Number of recommended items in top k
+        n_rec_k = sum((est >= threshold) for (est, _) in user_ratings[:k])
+
+        # Number of relevant and recommended items in top k
+        n_rel_and_rec_k = sum(((true_r >= threshold) and (est >= threshold))
+                              for (est, true_r) in user_ratings[:k])
+
+        # Precision@K: Proportion of recommended items that are relevant
+        precisions[uid] = n_rel_and_rec_k / n_rec_k if n_rec_k != 0 else 1
+
+        # Recall@K: Proportion of relevant items that are recommended
+        recalls[uid] = n_rel_and_rec_k / n_rel if n_rel != 0 else 1
+
+    return precisions, recalls
+
+print('Function creation successful!')
+
+
+# Next, we compute the precision and recall at `k` = 5 and 10 for each of our 4 models. We use 5-fold cross validation again to average the results across the entire dataseat.
+# 
+# Please note that this will take some time to compute.
+
+# <h1 style="color:red;">QUESTION 4: PRECISION/RECALL</h1>
+
+# **Compute the precision and recall, for each of the 4 models, at `k` = 5 and 10. This is 2 x 2 x 4 = 16 numerical values. Do you note anything interesting about these values? Anything differerent from the RMSE values you computed above?**
+
+# Precision can be defined as the percentage of recommendations which are actually relevant to the user.
+# Recall can be defined as the percentage of the relevant items which were recommended in the top k items.
+# 
+# Relevant item is defined as the movie that has a rating above 3.5. 
+# 
+# Precision is at the highest for the item-item model at top k=5. The random model has the lowest precision score at top k=5.
+# Generally by increasing k, recall score improves significantly across all four models. But they suffer minor precision score when k is increased to 10.
+
+# In[15]:
+
+
+# Make list of k values
+K = [5, 10]
+
+# Make list of models
+models = [model_random, model_user, model_item, model_matrix]
+
+# Create k-fold cross validation object
+kf = KFold(n_splits=5)
+
+for k in K:
+    for model in models:
+        print(f'>>> k={k}, model={model.__class__.__name__}')
+        # Run folder and take average
+        p = []
+        r = []
+        for trainset, testset in kf.split(data):
+            model.fit(trainset)
+            predictions = model.test(testset, verbose=False)
+            precisions, recalls = precision_recall_at_k(predictions, k=k, threshold=3.5)
+
+            # Precision and recall can then be averaged over all users
+            p.append(sum(prec for prec in precisions.values()) / len(precisions))
+            r.append(sum(rec for rec in recalls.values()) / len(recalls))
+        
+        print('>>> precision:', round(sum(p) / len(p), 3))
+        print('>>> reccall  :', round(sum(r) / len(r), 3))
+        print('\n')
+
+print('Precision and recall computation successful!')
+
+
+# #  Top-`n` Predictions
+
+# Finally, we can see what some of the actual movie ratings are for particular users, as outputs of our model.
+
+# Again, we define a helpful function.
+
+# In[16]:
+
+
+def get_top_n(predictions, n=5):
+    '''Return the top-N recommendation for each user from a set of predictions.
+
+    Args:
+        predictions(list of Prediction objects): The list of predictions, as
+            returned by the test method of an algorithm.
+        n(int): The number of recommendation to output for each user. Default
+            is 10.
+
+    Returns:
+    A dict where keys are user (raw) ids and values are lists of tuples:
+        [(raw item id, rating estimation), ...] of size n.
+    '''
+
+    # First map the predictions to each user.
+    top_n = dict()
+    for uid, iid, true_r, est, _ in predictions:
+        current = top_n.get(uid, [])
+        current.append((iid, est))
+        top_n[uid] = current
+
+    # Then sort the predictions for each user and retrieve the k highest ones.
+    for uid, user_ratings in top_n.items():
+        user_ratings.sort(key=lambda x: x[1], reverse=True)
+        top_n[uid] = user_ratings[:n]
+
+    return top_n
+
+print('Function creation successful!')
+
+
+# Then, we call this function on each of our models, first training on **all** the data we have available, then predicting on the remaining, missing data. We use `n`=5 here, but you can pick any reasonable value of `n` you would like.
+# 
+# This may take some time to compute, so be patient.
+
+# In[17]:
+
+
+trainset = data.build_full_trainset()
+testset = trainset.build_anti_testset()
+print('Trainset and testset creation successful!')
+
+
+# <h1 style="color:red;">QUESTION 5: TOP N PREDICTIONS</h1>
+
+# **Do the top n predictions that you received make sense? What is the rating value (1-5) of these predictions? How could you use these predictions in the real-world if you were trying to build a generic content recommender system for a company?**
+
+# The top n predictions provide a predicted movie score for 5 users. The rating value is the predicted movie rating for the particular user present below. For example, in the matrix factorization model, the user 169 received a predicted movie score of 4.494.
+# It looks like the random model and the user-user model is providing only rating 5 in their prediction. It may be that the algorithm is not working and effective. On the other hand, the item-item and the matrix factorization model are providing highly personalised scores.
+
+# In[18]:
+
+
+for model in models:
+    model.fit(trainset)
+    predictions = model.test(testset)
+    top_n = get_top_n(predictions, n=5)
+    # Print the first one
+    user = list(top_n.keys())[0]
+    print(f'model: {model}, {user}: {top_n[user]}')
+
+print('Top N computation successful!')
+
+
+# <hr>
+
+# Great job! Now, make sure you check out the **Conclusion** section of the [instruction manual](https://courses.edx.org/asset-v1:MITxPRO+DSx+2T2018+type@asset+block@4.1_instruction_manual.html) to wrap up this case study properly.
