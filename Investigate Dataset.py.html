@@ -1,0 +1,486 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# 
+# # Project: The Movie Database (TMDb) Analysis
+# ## Table of Contents
+# <ul>
+# <li><a href="#intro">Introduction</a></li>
+# <li><a href="#wrangling">Data Wrangling</a></li>
+# <li><a href="#eda">Exploratory Data Analysis</a></li>
+# <li><a href="#conclusions">Conclusions</a></li>
+# </ul>
+
+# <a id='intro'></a>
+# ## Introduction
+# 
+# 
+
+# This dataset was taken from The Movie Database, a community built movie and databases (https://www.themoviedb.org/about). Each row correspondes to a movie includes a range of data about each film. Relevant data to be used in the following analysis the following variables:
+# 
+#    -popularity      
+#    -budget          
+#    -revenue         
+#    -runtime         
+#    -vote_count      
+#    -vote_average    
+#    -release_year 
+#    
+# In this report, I will explore following questions:
+# 
+# What kinds of properties are associated with movies that have high revenue?
+# What kinds of properties are associated with movies that have high vote average?
+# 
+# 
+
+# Importing and installing necessary libraries for this data analysis project:
+
+# In[1]:
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+get_ipython().run_line_magic('matplotlib', 'inline')
+
+
+# <a id='wrangling'></a>
+# ## Data Wrangling
+# 
+# 
+# ### General Properties
+
+# Loading the data provided in the udacity learning portal and printing the first 5 rows to explore the data:
+
+# In[2]:
+
+
+df = pd.read_csv('tmdb-movies.csv')
+df.head()
+
+
+# Exploring the general properties of the dataset:
+
+# In[3]:
+
+
+df.shape
+
+
+# In[4]:
+
+
+df.describe()
+
+
+# In[5]:
+
+
+df.info()
+
+
+# In[6]:
+
+
+df.nunique()
+
+
+# 
+# 
+# ### Data Cleaning (Replace this with more specific notes!)
+
+# Checking if there is any duplication in our dataset:
+
+# In[7]:
+
+
+sum(df.duplicated())
+
+
+# Droping the dublicated row in our dataset:
+
+# In[8]:
+
+
+df.drop_duplicates(inplace = True)
+df.info()
+
+
+# Dropping following colomns from the tabble as it does not add value to our 2 questions.
+
+# In[9]:
+
+
+df.drop(['id','imdb_id','production_companies','original_title','director','cast','homepage','genres','tagline','overview','keywords','production_companies','release_date','budget_adj','revenue_adj'], axis = 1, inplace = True)
+
+
+# In[10]:
+
+
+df.head()
+
+
+# Checking if there is any null values in our dataset:
+
+# In[11]:
+
+
+df.info()
+
+
+# Checking the histegram distribution of each columns:
+
+# In[12]:
+
+
+df.hist(figsize=(10,8));
+
+
+# We found out that some the colums are very skewed to the right. Therefore, we might need to do some further cleaning.
+
+# In[13]:
+
+
+df.describe()
+
+
+# Folloing 5 point data summary of revenue and budget shows that there are some zero values which are erroneous and will adversely affect my overall analysis. Therefore I am revoming all the zero values from revenue and budget column:
+
+# In[14]:
+
+
+df = df.query('revenue > 0')
+df = df.query('budget > 0')
+
+
+# In[15]:
+
+
+df.describe()
+
+
+# Now the 5 point data summary of revenue and budget looks acceptable for my analysis.
+
+# <a id='eda'></a>
+# ## Exploratory Data Analysis
+# 
+# 
+# 
+# ### What kinds of properties are associated with movies that have high revenues?
+
+# Checking the histogram of revenue data:
+
+# In[16]:
+
+
+df['revenue'].hist();
+plt.legend()
+plt.xlabel('Revenue ($billions)')
+plt.ylabel('Number of movies')
+plt.title('Histogram of Revenue')
+
+
+# View the min, 25%, 50%, 75%, max revenue values with Pandas describe:
+
+# In[17]:
+
+
+df['revenue'].describe()
+
+
+# We will have 4 different group that measuers the revenue. Bin edges that will be used to "cut" the data into groups:
+
+# In[18]:
+
+
+bin_edges = [2.000000e+00, 7.732325e+06, 3.185308e+07, 9.996575e+07, 2.781506e+09]
+
+
+# Labels for the four revenue level groups:
+
+# In[19]:
+
+
+bin_names = ['Low','Medium','Moderately High','High'] 
+
+
+# Creates revenue_success column:
+
+# In[20]:
+
+
+df['revenue_success'] = pd.cut(df['revenue'], bin_edges, labels=bin_names)
+
+df.head()
+
+
+# Check the relationship between popularity and revenue success:
+
+# In[21]:
+
+
+df.groupby('revenue_success')['popularity'].mean().plot(kind = 'bar')
+plt.legend()
+plt.xlabel('Revenue Success')
+plt.ylabel('Popularity')
+plt.title('Relationship between revenue success and popularity')
+
+
+# The bar chart above shows that there is a strong positive correlation between revenue success and popularity. This suggest that popularity is a major factor for high revenue earning movies.
+
+# Check the relationship between budget and revenue success:
+
+# In[22]:
+
+
+df.groupby('revenue_success')['budget'].mean().plot(kind = 'bar')
+plt.legend()
+plt.xlabel('Revenue Success')
+plt.ylabel('Budget')
+plt.title('Relationship between revenue success and budget')
+
+
+# The bar chart above shows that there is a strong positive correlation between revenue success and budget. This suggest that budget is a major factor for high revenue earning movies.
+
+# Check the relationship between runtime and revenue success:
+
+# In[23]:
+
+
+df.groupby('revenue_success')['runtime'].mean().plot(kind = 'bar')
+plt.legend()
+plt.xlabel('Revenue Success')
+plt.ylabel('Runtime')
+plt.title('Relationship between revenue success and runtime')
+
+
+# The bar chart above shows that there is a positive correlation between revenue success and runtime.But the corelation is not so strong. This suggest that runtime is a minor factor for high revenue earning movies.
+
+# Check the relationship between vote average and revenue success:
+
+# In[24]:
+
+
+df.groupby('revenue_success')['vote_average'].mean().plot(kind = 'bar')
+plt.legend()
+plt.xlabel('Revenue Success')
+plt.ylabel('Vote average')
+plt.title('Relationship between revenue success and vote average')
+
+
+# The bar chart above shows that there is a positive correlation between revenue success and vote average.But the corelation is not so strong. This suggest that vote average is a minor factor for high revenue earning movies.
+
+# Check if there is any relationship between release year and revenue:
+
+# In[26]:
+
+
+df.plot(x = 'release_year', y = 'revenue', kind = 'scatter');
+plt.legend()
+plt.xlabel('Release year')
+plt.ylabel('Revenue')
+plt.title('Relationship between release year and revenue')
+
+
+# The figure above shows that there is a positive correlation between revenue and release year. This might suggest that newer movies are more likely to have a higher revenue success. But this might be related to newer movies are having a bigger budget which gathers more attention and ticket sales. Therefore, lets check if there is any increase in movie budgets each year: 
+
+# In[27]:
+
+
+df.plot(x = 'release_year', y = 'budget', kind = 'scatter');
+plt.legend()
+plt.xlabel('Release year')
+plt.ylabel('Budget')
+plt.title('Relationship between release year and budget')
+
+
+# As we expected that the postivie correlation between release year and revenue was because of budget. As we explored previously, budget is a major factor for high revenue earning movies.
+
+# ### What kinds of properties are associated with movies that have high vote average?
+
+# Checking the histogram of vote average data:
+
+# In[28]:
+
+
+df['vote_average'].hist();
+plt.legend()
+plt.xlabel('Vote Average')
+plt.ylabel('Number of movies')
+plt.title('Histogram of Vote Average')
+
+
+# View the new min, 25%, 50%, 75%, max vote average values:
+
+# In[29]:
+
+
+df['vote_average'].describe()
+
+
+# We will have 4 different group that measuers the vote average. Bin edges that will be used to "cut" the data into groups:
+
+# In[31]:
+
+
+bin_edges = [2.200000, 5.700000, 6.200000 ,6.700000, 8.400000]
+
+
+# Labels for the four revenue level groups:
+
+# In[32]:
+
+
+bin_names = ['Low','Medium','Moderately High','High'] 
+
+
+# Creates vote_success column:
+
+# In[33]:
+
+
+df['vote_success'] = pd.cut(df['vote_average'], bin_edges, labels=bin_names)
+
+df.head()
+
+
+# Check the relationship between popularity and vote success:
+
+# In[34]:
+
+
+df.groupby('vote_success')['popularity'].mean().plot(kind = 'bar')
+plt.legend()
+plt.xlabel('Vote Success')
+plt.ylabel('Popularity')
+plt.title('Relationship between vote success and popularity')
+
+
+# The bar chart above shows that there is a strong positive correlation between vote success and popularity. This suggest that popularity is a major factor for high vote success movies.
+
+# Check the relationship between budget and vote success:
+
+# In[35]:
+
+
+df.groupby('vote_success')['budget'].mean().plot(kind = 'bar')
+plt.legend()
+plt.xlabel('Vote Success')
+plt.ylabel('Budget')
+plt.title('Relationship between vote success and budget')
+
+
+# The bar chart above shows that budget has a curvilinear correlation with high vote average. This suggest that budget is not a good factor for higg vote success movies.
+
+# Check the relationship between revenue and vote success:
+
+# In[36]:
+
+
+df.groupby('vote_success')['revenue'].mean().plot(kind = 'bar')
+plt.legend()
+plt.xlabel('Vote Success')
+plt.ylabel('Revenue')
+plt.title('Relationship between vote success and revenue')
+
+
+# The bar chart above shows that there is a strong positive correlation between vote success and revenue. This suggest that revenue is a major factor for high vote success movies.
+
+# Check the relationship between runtime and vote success:
+
+# In[37]:
+
+
+df.groupby('vote_success')['runtime'].mean().plot(kind = 'bar')
+plt.legend()
+plt.xlabel('Vote Success')
+plt.ylabel('Run time')
+plt.title('Relationship between vote success and run time')
+
+
+# The bar chart above shows that there is a positive correlation between vote success and runtime.But the corelation is not so strong. This suggest that runtime is a minor factor for high vote success movies.
+
+# Check if there is any relationship between release year and vote average:
+
+# In[39]:
+
+
+df.plot(x = 'release_year', y = 'vote_average', kind = 'scatter');
+plt.legend()
+plt.xlabel('Release year')
+plt.ylabel('Vote average')
+plt.title('Relationship between release year and vote average')
+
+
+# The figure above shows that release year do not have any correlation with high vote average.
+
+# Check if there is any relationship between vote count and vote average:
+
+# In[40]:
+
+
+df.plot(x = 'vote_count', y = 'vote_average', kind = 'scatter');
+plt.legend()
+plt.xlabel('Vote count')
+plt.ylabel('Vote average')
+plt.title('Relationship between vote count and vote average')
+
+
+# The figure above showes that vote counts have some positive correlation with high vote average.
+
+# <a id='conclusions'></a>
+# ## Conclusions
+# 
+# ### What kinds of properties are associated with movies that have high revenues?
+# 
+# In this question, I wanted to know what factors lead to movies that have high revenues.
+# 
+# I found out that there were too many rows which had 0 revenues. So I had to remove those rows with 0 revenues.
+# 
+# After that, I grouped my new data set into 4 groups using the min, 25%, 50%, 75% and max revenue value. I created a new column that indicated revenue success. 
+# 
+# In my founding, budget and popularity are major factors for high revenue movies. 
+# 
+# On the other hand, run time and vote average are minor factors for high revenue movies. 
+# 
+# I wanted to check if release year has anything to do with high revenue. It showed that release year has a positive correlation with high revenue. It also showed that the budget has a positive correlation with high revenue. Therefore, each year movie budget goes up which is a major factor for high revenue movies.
+# 
+# ### What kinds of properties are associated with movies that have high vote average?
+# 
+# In this question, I wanted to know what factors lead to movies that have high vote average.
+# 
+# I grouped my data set into 4 groups using the min, 25%, 50%, 75% and max vote average value. I created a new column that indicated vote success. 
+# 
+# In my founding, revenue and popularity have major factor for high vote average. And run time is a minor factor for high vote average. 
+# 
+# On the other hand, budget has curvilinear correlation with high vote average. 
+# 
+# I wanted to check if release year has anything to do with vote average. It showed that release year do not have any correlation with high vote average.
+# 
+# 
+# I wanted to check if vote counts has anything to with vote average. It showed that vote counts have some positive correlation with high vote average.
+# 
+# ### Limitation
+# 
+# There were several limiations in the dataset that might have hindered my overall analysis.
+# 
+# I discvocered there were several null or missing values in the columns such as Overview, Genre and Cast. However, I did not needed to use following columns for my analysis, so i droped those coloumns.
+# 
+# There were some duplicates in my analysis. So i dropped those dubplicates.
+# 
+# There were soeme erroneous values in budged and revenue columns. This columns would have effected my analysis if i did not clean the data. I used pandas describe feautes to analys 5 point data summary of revenue and budget. It showed that there were too many 0 values in revenue and budget. So,i used pandas querry to clean those rows which had 0. This worked as expected, and it represented the population in pretty good accuracy. However, all those data cleaning reduced my dataset considerably.
+
+# In[41]:
+
+
+from subprocess import call
+call(['python', '-m', 'nbconvert', 'Investigate_a_Dataset.ipynb'])
+
+
+# In[ ]:
+
+
+
+
