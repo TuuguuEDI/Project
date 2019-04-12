@@ -13,7 +13,7 @@ This repository is for **my personal data analytics projects hobby** and i will 
 
 ## Instruction
 
-Each project folders have thier own codes and documenents for support and collabration.
+Each project folders have thier own codes and documenents for support and collabration. Insruction are not finished at the moment.
 
 ## Licence
 
